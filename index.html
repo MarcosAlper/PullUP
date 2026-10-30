@@ -34,12 +34,10 @@
     <!-- FontAwesome icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Desativa seleção de texto rápida em botões para toque mais fluido */
         button {
             -webkit-tap-highlight-color: transparent;
             user-select: none;
         }
-        /* Custom Scrollbar */
         ::-webkit-scrollbar {
             width: 6px;
         }
@@ -66,13 +64,43 @@
         </div>
         
         <div class="flex items-center space-x-2">
-            <!-- Supabase Status Badge -->
-            <div id="supabase-status-badge" class="hidden text-xs px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 flex items-center space-x-1">
-                <span id="supabase-indicator" class="w-2 h-2 rounded-full bg-amber-500"></span>
-                <span id="supabase-status-text" class="text-slate-300">Local</span>
-            </div>
+            <span id="user-email-display" class="text-xs text-slate-400 max-w-[120px] truncate hidden"></span>
+            <button id="logout-btn" onclick="handleLogout()" class="hidden text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1.5 rounded-lg border border-slate-700 transition">
+                <i class="fa-solid fa-right-from-bracket"></i> Sair
+            </button>
         </div>
     </header>
+
+    <!-- Modal de Autenticação / Login -->
+    <div id="auth-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-darkcard border border-darkborder rounded-3xl p-6 w-full max-w-sm shadow-2xl space-y-4">
+            <div class="text-center">
+                <h2 class="text-xl font-bold text-white">Bem-vindo ao PullUP!</h2>
+                <p class="text-xs text-slate-400 mt-1">Entre ou crie sua conta para acessar seus dados</p>
+            </div>
+
+            <form id="auth-form" onsubmit="handleAuth(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">E-mail</label>
+                    <input type="email" id="auth-email" required placeholder="seu@email.com" class="w-full bg-darkbg border border-darkborder rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-brand-500 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Senha</label>
+                    <input type="password" id="auth-password" required minlength="6" placeholder="******" class="w-full bg-darkbg border border-darkborder rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-brand-500 text-sm">
+                </div>
+
+                <button type="submit" id="auth-submit-btn" class="w-full bg-brand-600 hover:bg-brand-500 text-white font-semibold py-2.5 rounded-xl transition shadow-lg shadow-brand-600/30">
+                    Entrar
+                </button>
+            </form>
+
+            <div class="text-center pt-2 border-t border-darkborder">
+                <button onclick="toggleAuthMode()" id="toggle-auth-btn" class="text-xs text-brand-500 hover:underline">
+                    Não tem conta? Cadastre-se
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Main Container -->
     <main class="flex-1 max-w-md w-full mx-auto px-4 pt-4 space-y-6">
@@ -115,7 +143,7 @@
             </div>
         </section>
 
-        <!-- Custom / Manual Entry Form Modal Trigger or Toggle -->
+        <!-- Custom / Manual Entry Form -->
         <section class="bg-darkcard border border-darkborder rounded-2xl p-4 shadow-md">
             <button id="toggle-manual-form" class="w-full flex justify-between items-center text-sm font-medium text-slate-300">
                 <span class="flex items-center gap-2"><i class="fa-regular fa-calendar-plus text-brand-500"></i> Registro Retroativo / Personalizado</span>
@@ -143,7 +171,6 @@
                 <h3 class="font-bold text-slate-200 text-base flex items-center gap-2">
                     <i class="fa-solid fa-chart-column text-brand-500"></i> Progresso
                 </h3>
-                <!-- Filter Toggle Buttons -->
                 <div class="inline-flex bg-darkbg p-1 rounded-xl border border-darkborder text-xs w-full sm:w-auto">
                     <button id="filter-days-btn" onclick="setChartFilter('days')" class="flex-1 sm:flex-none px-3 py-1.5 rounded-lg font-medium text-white bg-slate-700 transition">
                         Por Dia
@@ -154,7 +181,6 @@
                 </div>
             </div>
 
-            <!-- Canvas Container -->
             <div class="relative w-full h-56">
                 <canvas id="pullupChart"></canvas>
             </div>
@@ -170,10 +196,8 @@
                 <span id="history-count-badge" class="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700">0 registros</span>
             </div>
 
-            <!-- Scrollable Log List -->
             <div id="history-list" class="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-                <!-- History items injected dynamically -->
-                <p class="text-center text-xs text-slate-500 py-6">Nenhum registro ainda. Faça sua primeira barra!</p>
+                <p class="text-center text-xs text-slate-500 py-6">Aguardando login...</p>
             </div>
         </section>
 
@@ -181,42 +205,12 @@
 
     <!-- Custom Modal for Quick Input -->
     <div id="custom-input-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-darkcard border border-darkborder rounded-3xl p-6 w-full max-w-xs shadow-2xl space-y-4 transform transition-all scale-100">
+        <div class="bg-darkcard border border-darkborder rounded-3xl p-6 w-full max-w-xs shadow-2xl space-y-4">
             <h3 class="text-lg font-bold text-white text-center">Digite as Repetições</h3>
             <input type="number" id="quick-custom-count" min="1" max="1000" placeholder="Ex: 12" class="w-full bg-darkbg border border-darkborder rounded-2xl px-4 py-3 text-2xl font-bold text-center text-brand-500 focus:outline-none focus:border-brand-500">
             <div class="grid grid-cols-2 gap-3">
                 <button onclick="closeCustomInputModal()" class="py-2.5 bg-slate-800 text-slate-300 font-semibold rounded-xl border border-slate-700">Cancelar</button>
                 <button onclick="submitCustomQuickReps()" class="py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl shadow-lg shadow-brand-600/30">Adicionar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Configurações Supabase -->
-    <div id="settings-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
-        <div class="bg-darkcard border-t sm:border border-darkborder rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto space-y-5">
-            <div class="flex justify-between items-center">
-                <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                    <i class="fa-solid fa-database text-brand-500"></i> Configurar Banco de Dados
-                </h3>
-                <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white text-lg p-1">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-
-            <div class="border-t border-darkborder pt-4 space-y-2">
-                <div class="flex justify-between items-center">
-                    <span class="text-xs font-bold text-slate-300">Script SQL para o Supabase</span>
-                    <button onclick="copySQLScript()" class="text-xs text-brand-500 hover:text-brand-400 flex items-center gap-1">
-                        <i class="fa-regular fa-copy"></i> Copiar SQL
-                    </button>
-                </div>
-                <p class="text-[11px] text-slate-400">Execute este código no SQL Editor do seu painel do Supabase:</p>
-                <pre class="bg-darkbg p-3 rounded-xl border border-darkborder text-[11px] text-slate-300 font-mono overflow-x-auto select-all"><code id="sql-code-block">create table pullups (
-  id bigint generated by default as identity primary key,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  count integer not null,
-  timestamp timestamp with time zone default now()
-);</code></pre>
             </div>
         </div>
     </div>
@@ -227,28 +221,23 @@
         <span id="toast-msg">Mensagem</span>
     </div>
 
-    <!-- JavaScript Principal -->
     <script>
-        // ESTADO DA APLICAÇÃO
+        const SUPABASE_URL = 'https://fbvearftixiqawzrfdlh.supabase.co';
+        const SUPABASE_ANON_KEY = "sb_publishable_2duod4mJhCzIMr850bsaEA_mkfewUGr";
+
         let pullupRecords = [];
         let supabaseClient = null;
         let chartInstance = null;
-        let currentChartFilter = 'days'; // 'days' | 'hours'
+        let currentChartFilter = 'days';
+        let isSignUpMode = false;
 
-        const LOCAL_STORAGE_KEY = 'pullup_tracker_data_v1';
-        const SUPABASE_CONFIG_KEY = 'pullup_tracker_supabase_cfg';
-
-        // INICIALIZAÇÃO
         window.addEventListener('DOMContentLoaded', async () => {
             initDateInputs();
-            loadLocalRecords();
             initSupabaseClient();
-            await syncData();
-            renderUI();
+            await checkUserSession();
             setupEventListeners();
         });
 
-        // Configura inputs de data e hora atuais por padrão
         function initDateInputs() {
             const now = new Date();
             const year = now.getFullYear();
@@ -258,13 +247,10 @@
             const minutes = String(now.getMinutes()).padStart(2, '0');
 
             document.getElementById('manual-datetime').value = `${year}-${month}-${day}T${hours}:${minutes}`;
-            
-            // Format Today string
             const options = { weekday: 'short', day: 'numeric', month: 'short' };
             document.getElementById('today-date-str').textContent = now.toLocaleDateString('pt-BR', options);
         }
 
-        // Event listeners da UI
         function setupEventListeners() {
             document.getElementById('toggle-manual-form').addEventListener('click', () => {
                 const container = document.getElementById('manual-form-container');
@@ -279,101 +265,79 @@
                     icon.classList.remove('rotate-180');
                 }
             });
-
-            document.getElementById('open-settings-btn').addEventListener('click', () => {
-                document.getElementById('settings-modal').classList.remove('hidden');
-            });
         }
 
-        // CARREGAR / SALVAR LOCALSTORAGE
-        function loadLocalRecords() {
-            try {
-                const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-                if (raw) {
-                    pullupRecords = JSON.parse(raw);
-                }
-            } catch (e) {
-                console.error('Erro ao ler localStorage', e);
-                pullupRecords = [];
-            }
-        }
-
-        function saveLocalRecords() {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(pullupRecords));
-        }
-
-        // SUPABASE INTEGRATION
         function initSupabaseClient() {
-            const cfgRaw = localStorage.getItem(SUPABASE_CONFIG_KEY);
-            const badge = document.getElementById('supabase-status-badge');
-            const indicator = document.getElementById('supabase-indicator');
-            const statusText = document.getElementById('supabase-status-text');
-
-            if (cfgRaw) {
-                try {
-                    const cfg = JSON.parse(cfgRaw);
-                    if (cfg.url && cfg.key && window.supabase) {
-                        supabaseClient = window.supabase.createClient(cfg.url, cfg.key);
-                        badge.classList.remove('hidden');
-                        indicator.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
-                        statusText.textContent = 'Supabase ON';
-                        
-                        // Preenche campos do modal
-                        document.getElementById('cfg-supabase-url').value = cfg.url;
-                        document.getElementById('cfg-supabase-key').value = cfg.key;
-                        return;
-                    }
-                } catch (e) {
-                    console.error('Erro ao inicializar Supabase', e);
-                }
+            try {
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            } catch (e) {
+                console.error('Erro ao inicializar Supabase:', e);
             }
-
-            supabaseClient = null;
-            badge.classList.remove('hidden');
-            indicator.className = 'w-2 h-2 rounded-full bg-amber-500';
-            statusText.textContent = 'Apenas Local';
         }
 
-        async function saveSupabaseCredentials(e) {
-            e.preventDefault();
-            const url = document.getElementById('cfg-supabase-url').value.trim();
-            const key = document.getElementById('cfg-supabase-key').value.trim();
+        // GERENCIAMENTO DE SESSÃO / AUTENTICAÇÃO
+        async function checkUserSession() {
+            if (!supabaseClient) return;
 
-            if (!url || !key) {
-                showToast('Preencha a URL e a Key do Supabase', 'warning');
-                return;
-            }
-
-            localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify({ url, key }));
-            initSupabaseClient();
-            
-            showToast('Conectando ao Supabase...', 'info');
-            const success = await syncData();
-            
-            if (success) {
-                showToast('Sincronizado com Supabase!', 'success');
-                closeSettingsModal();
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session) {
+                onUserLoggedIn(session.user);
             } else {
-                showToast('Falha ao conectar. Verifique as credenciais/tabela.', 'error');
+                document.getElementById('auth-modal').classList.remove('hidden');
             }
         }
 
-        function clearSupabaseCredentials() {
-            localStorage.removeItem(SUPABASE_CONFIG_KEY);
-            document.getElementById('cfg-supabase-url').value = '';
-            document.getElementById('cfg-supabase-key').value = '';
-            supabaseClient = null;
-            initSupabaseClient();
-            closeSettingsModal();
-            showToast('Desconectado do Supabase', 'info');
+        function toggleAuthMode() {
+            isSignUpMode = !isSignUpMode;
+            document.getElementById('auth-submit-btn').textContent = isSignUpMode ? 'Cadastrar' : 'Entrar';
+            document.getElementById('toggle-auth-btn').textContent = isSignUpMode ? 'Já tem conta? Entrar' : 'Não tem conta? Cadastre-se';
         }
 
-        // Sincronização de dados entre Local e Supabase
-        async function syncData() {
-            if (!supabaseClient) return false;
+        async function handleAuth(e) {
+            e.preventDefault();
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
 
             try {
-                // Fetch do Supabase
+                if (isSignUpMode) {
+                    const { data, error } = await supabaseClient.auth.signUp({ email, password });
+                    if (error) throw error;
+                    showToast('Conta criada com sucesso!', 'success');
+                    if (data.user) onUserLoggedIn(data.user);
+                } else {
+                    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                    if (error) throw error;
+                    showToast('Login realizado!', 'success');
+                    if (data.user) onUserLoggedIn(data.user);
+                }
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        function onUserLoggedIn(user) {
+            document.getElementById('auth-modal').classList.add('hidden');
+            document.getElementById('user-email-display').textContent = user.email;
+            document.getElementById('user-email-display').classList.remove('hidden');
+            document.getElementById('logout-btn').classList.remove('hidden');
+            fetchSupabaseData();
+        }
+
+        async function handleLogout() {
+            await supabaseClient.auth.signOut();
+            pullupRecords = [];
+            document.getElementById('user-email-display').classList.add('hidden');
+            document.getElementById('logout-btn').classList.add('hidden');
+            document.getElementById('auth-modal').classList.remove('hidden');
+            renderUI();
+            showToast('Sessão encerrada', 'info');
+        }
+
+        // CARREGAR E MANIPULAR DADOS NUVEM
+        async function fetchSupabaseData() {
+            if (!supabaseClient) return;
+
+            try {
                 const { data, error } = await supabaseClient
                     .from('pullups')
                     .select('*')
@@ -382,43 +346,19 @@
                 if (error) throw error;
 
                 if (data) {
-                    // Mesclar registros locais com remoto garantindo unicidade por timestamp/id
-                    const remoteRecords = data.map(item => ({
+                    pullupRecords = data.map(item => ({
                         id: item.id,
                         count: Number(item.count),
                         timestamp: new Date(item.timestamp).toISOString()
                     }));
-
-                    // Se não existirem dados locais, usa remotos
-                    if (pullupRecords.length === 0) {
-                        pullupRecords = remoteRecords;
-                    } else {
-                        // Mesclar ignorando duplicatas por timestamp aproximado
-                        const existingTimes = new Set(pullupRecords.map(r => new Date(r.timestamp).getTime()));
-                        
-                        remoteRecords.forEach(rem => {
-                            const time = new Date(rem.timestamp).getTime();
-                            if (!existingTimes.has(time)) {
-                                pullupRecords.push(rem);
-                            }
-                        });
-
-                        // Ordenar decrescente
-                        pullupRecords.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                    }
-
-                    saveLocalRecords();
                     renderUI();
-                    return true;
                 }
             } catch (err) {
-                console.error('Erro na sincronização Supabase:', err);
-                return false;
+                console.error('Erro ao buscar dados:', err);
+                showToast('Erro ao carregar registros', 'error');
             }
-            return false;
         }
 
-        // ADICIONAR REGISTROS
         async function addRecord(count, customIsoTimestamp = null) {
             const countNum = parseInt(count, 10);
             if (isNaN(countNum) || countNum <= 0) {
@@ -426,101 +366,68 @@
                 return;
             }
 
-            const record = {
-                id: Date.now(), // id temporário local
-                count: countNum,
-                timestamp: customIsoTimestamp || new Date().toISOString()
-            };
+            const timestampToSave = customIsoTimestamp || new Date().toISOString();
 
-            // Salva Local
-            pullupRecords.unshift(record);
-            saveLocalRecords();
-            renderUI();
-            showToast(`+${countNum} barras registradas!`, 'success');
+            try {
+                showToast('Salvando...', 'info');
+                const { data, error } = await supabaseClient
+                    .from('pullups')
+                    .insert([{ count: countNum, timestamp: timestampToSave }])
+                    .select();
 
-            // Salva Supabase
-            if (supabaseClient) {
-                try {
-                    const { data, error } = await supabaseClient
-                        .from('pullups')
-                        .insert([{ count: countNum, timestamp: record.timestamp }])
-                        .select();
+                if (error) throw error;
 
-                    if (!error && data && data.length > 0) {
-                        // Atualiza ID real retornado do Supabase
-                        record.id = data[0].id;
-                        saveLocalRecords();
-                    }
-                } catch (e) {
-                    console.error('Erro ao enviar ao Supabase:', e);
+                if (data && data.length > 0) {
+                    const newRec = {
+                        id: data[0].id,
+                        count: Number(data[0].count),
+                        timestamp: new Date(data[0].timestamp).toISOString()
+                    };
+                    pullupRecords.unshift(newRec);
+                    renderUI();
+                    showToast(`+${countNum} barras registradas!`, 'success');
                 }
+            } catch (e) {
+                console.error('Erro ao salvar:', e);
+                showToast('Erro ao salvar registro', 'error');
             }
         }
 
-        // Botões rápidos
-        function addQuickReps(amount) {
-            addRecord(amount);
-        }
-
-        // Entrada personalizada no Modal
+        function addQuickReps(amount) { addRecord(amount); }
         function openCustomInputModal() {
             document.getElementById('custom-input-modal').classList.remove('hidden');
             const input = document.getElementById('quick-custom-count');
             input.value = '';
             setTimeout(() => input.focus(), 100);
         }
-
-        function closeCustomInputModal() {
-            document.getElementById('custom-input-modal').classList.add('hidden');
-        }
-
+        function closeCustomInputModal() { document.getElementById('custom-input-modal').classList.add('hidden'); }
         function submitCustomQuickReps() {
             const val = document.getElementById('quick-custom-count').value;
-            if (val) {
-                addRecord(val);
-                closeCustomInputModal();
-            }
+            if (val) { addRecord(val); closeCustomInputModal(); }
         }
 
-        // Envio formulário manual
         function submitManualRecord() {
             const count = document.getElementById('manual-count').value;
             const dateVal = document.getElementById('manual-datetime').value;
-
-            if (!dateVal) {
-                showToast('Selecione uma data e hora válidas', 'warning');
-                return;
-            }
-
-            const isoDate = new Date(dateVal).toISOString();
-            addRecord(count, isoDate);
-            
-            // Oculta o form após envio
+            if (!dateVal) { showToast('Selecione data/hora', 'warning'); return; }
+            addRecord(count, new Date(dateVal).toISOString());
             document.getElementById('manual-form-container').classList.add('hidden');
             document.getElementById('manual-form-icon').classList.remove('rotate-180');
         }
 
-        // EXCLUIR REGISTRO
         async function deleteRecord(id) {
-            const index = pullupRecords.findIndex(r => r.id === id);
-            if (index === -1) return;
+            try {
+                const { error } = await supabaseClient.from('pullups').delete().eq('id', id);
+                if (error) throw error;
 
-            const deletedItem = pullupRecords[index];
-            pullupRecords.splice(index, 1);
-            saveLocalRecords();
-            renderUI();
-            showToast('Registro removido', 'info');
-
-            if (supabaseClient && deletedItem.id) {
-                try {
-                    await supabaseClient.from('pullups').delete().eq('id', deletedItem.id);
-                } catch (e) {
-                    console.error('Erro ao deletar no Supabase:', e);
-                }
+                pullupRecords = pullupRecords.filter(r => r.id !== id);
+                renderUI();
+                showToast('Registro removido', 'info');
+            } catch (e) {
+                showToast('Erro ao excluir registro', 'error');
             }
         }
 
-        // RENDERIZAÇÃO GERAL DA INTERFACE
         function renderUI() {
             renderTodayStats();
             renderHistoryList();
@@ -529,17 +436,13 @@
 
         function renderTodayStats() {
             const todayStr = new Date().toDateString();
-            
             let todayTotal = 0;
             let allTimeTotal = 0;
 
             pullupRecords.forEach(rec => {
                 const recDate = new Date(rec.timestamp);
                 allTimeTotal += rec.count;
-                
-                if (recDate.toDateString() === todayStr) {
-                    todayTotal += rec.count;
-                }
+                if (recDate.toDateString() === todayStr) todayTotal += rec.count;
             });
 
             document.getElementById('today-total-count').textContent = todayTotal;
@@ -552,11 +455,10 @@
             badge.textContent = `${pullupRecords.length} registro${pullupRecords.length !== 1 ? 's' : ''}`;
 
             if (pullupRecords.length === 0) {
-                container.innerHTML = `<p class="text-center text-xs text-slate-500 py-6">Nenhum registro ainda. Faça sua primeira barra!</p>`;
+                container.innerHTML = `<p class="text-center text-xs text-slate-500 py-6">Nenhum registro encontrado.</p>`;
                 return;
             }
 
-            // Ordena mais recentes primeiro
             const sorted = [...pullupRecords].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
             container.innerHTML = sorted.map(item => {
@@ -594,10 +496,8 @@
             return `Há ${days} dia(s)`;
         }
 
-        // GRÁFICOS (CHART.JS)
         function setChartFilter(filter) {
             currentChartFilter = filter;
-            
             const btnDays = document.getElementById('filter-days-btn');
             const btnHours = document.getElementById('filter-hours-btn');
 
@@ -616,12 +516,10 @@
 
         function renderChart() {
             const ctx = document.getElementById('pullupChart').getContext('2d');
-
             let labels = [];
             let chartData = [];
 
             if (currentChartFilter === 'days') {
-                // Agrupamento dos últimos 7 dias
                 const daysMap = {};
                 const now = new Date();
 
@@ -642,9 +540,7 @@
 
                 labels = Object.keys(daysMap);
                 chartData = Object.values(daysMap);
-
             } else {
-                // Agrupamento por períodos do dia (Manhã, Tarde, Noite, Madrugada)
                 const periods = {
                     'Madrugada (00h-06h)': 0,
                     'Manhã (06h-12h)': 0,
@@ -669,9 +565,7 @@
                 ];
             }
 
-            if (chartInstance) {
-                chartInstance.destroy();
-            }
+            if (chartInstance) chartInstance.destroy();
 
             chartInstance = new Chart(ctx, {
                 type: 'bar',
@@ -717,28 +611,6 @@
                     }
                 }
             });
-        }
-
-        // UTILS: MODAL CONFIGURAÇÕES E TOAST
-        function closeSettingsModal() {
-            document.getElementById('settings-modal').classList.add('hidden');
-        }
-
-        function copySQLScript() {
-            const sqlText = document.getElementById('sql-code-block').innerText;
-            
-            // Clipboard copy seguro para iFrames
-            const textarea = document.createElement('textarea');
-            textarea.value = sqlText;
-            document.body.appendChild(textarea);
-            textarea.select();
-            try {
-                document.execCommand('copy');
-                showToast('SQL copiado para a área de transferência!', 'success');
-            } catch (err) {
-                showToast('Falha ao copiar SQL', 'error');
-            }
-            document.body.removeChild(textarea);
         }
 
         function showToast(message, type = 'info') {
